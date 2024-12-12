@@ -21,7 +21,6 @@ knitr::knit_engines$set(txt = function(options) {
 # Load Library here
 library(dplyr)
 library(ggplot2)
-
 ```
 
 # View Data
@@ -29,15 +28,31 @@ library(ggplot2)
 ```{r}
 nhanes <- read.csv("data/BMI714_NHANES2020_Data.csv", header = T)
 nhanes_var_name <- read.csv("data/BMI714_NHANES_VariableDictionary.csv", header = T)
-head(nhanes)
+# Rename the columns in nhanes
+colnames(nhanes) <- ifelse(colnames(nhanes) %in% nhanes_var_name$BMI_714_Variable_Name, 
+                           nhanes_var_name$Variable_Name[match(colnames(nhanes),nhanes_var_name$BMI_714_Variable_Name)], 
+                           colnames(nhanes))  # Keep names unchanged if not in mapping
+
+
+nhanes %>% nrow()
 ```
 
 
+```{r}
+nhanes_var_name %>% select(Data_File_Description) %>% unique()
+```
 
 
+weight in kg: BMXWT
+```{r}
+nhanes %>% select(BMXWT) %>% is.na() %>% sum()
+```
 
 
+## independent variable consideration
+Dairy porduct used: Greater consumption of total dairy products prevention of weight gain in middle-aged and elderly women who are initially normal weight. https://pmc.ncbi.nlm.nih.gov/articles/PMC4807700/
 
+Type of Milk: 1%/skim milk is more common among overweight/obese preschoolers, potentially reflecting the choice of parents to give overweight/obese children low-fat milk to drink. Nevertheless, 1%/skim milk does not appear to restrain body weight gain between 2–4 years in this age range, emphasizing a need for weight-targeted recommendations with a greater evidence basis. https://pmc.ncbi.nlm.nih.gov/articles/PMC4439101/
 
 
 
