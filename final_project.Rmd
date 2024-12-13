@@ -150,7 +150,7 @@ Smoking(SMD460)
 Diabetes(DIQ010)
 Alcohol consumption(ALQ121)
 
-Goal: how socioeconmic state (income), eating behaviour affect obesity (BMI)
+Goal: how socioeconmic state (income), eating behaviour affect obesity (BMI) in adult
 
 # Prep data
 ```{r}
@@ -179,29 +179,12 @@ data <- data %>%
 ```
 
 
-## Type of Milk
-For Type of Milk DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, we will combine them into one variable. 
+## Process independent variable
 
 ```{r}
-# check for how many people drink more than one type of milk
-data %>% 
-  rowwise() %>%  # Enable row-wise operations
-  mutate(
-    milk_type = coalesce(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U),  # Combine into one column
-    multiple_values = sum(!is.na(c(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U))) > 1  # Flag rows with multiple values
-  ) %>%
-  ungroup() %>%  # Remove row-wise grouping after calculations 
-  filter(multiple_values) %>%
-  select(multiple_values, DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, milk_type)
-```
- 
-```{r}
- nrow(data)
-```
- 
- want to see combined effect of drinking mupltiple type of milk: Group participants who drink multiple types of milk into a single “Mixed Milk” category.
-
-```{r}
+########### Type of Milk ###########
+# For Type of Milk DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, we will combine them into one variable. 
+#  want to see combined effect of drinking mupltiple type of milk: Group participants who drink multiple types of milk into a single “Mixed Milk” category.
 data <- data %>%
   rowwise() %>%
   mutate(milk_type = if_else(sum(!is.na(c(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U))) > 1, 
@@ -222,12 +205,9 @@ data <- data %>% mutate(milk_type = case_when(
   milk_type == "99" ~ NA_character_, #Unknown
   TRUE ~ NA_character_ # NA into Unknown
 ))
-```
 
 
-
-## Milk consumption 
-```{r}
+########### Milk consumption  ###########
 data <- data %>%
   mutate(
     milk_consumption = case_when(
@@ -242,13 +222,8 @@ data <- data %>%
     )
   ) 
 
-data %>%
-  group_by(milk_consumption) %>%
-  summarise(count = n())
-```
 
-## Income
-```{r}
+########### Poverty  ###########
 data <- data %>%
   mutate(
     poverty_category = case_when(
@@ -261,13 +236,10 @@ data <- data %>%
     )
   )
 
-data %>%
-  group_by(poverty_category) %>%
-  summarise(count = n())
-```
 
-# Alcohol
-```{r}
+
+
+########### Alcohol  ###########
 data <- data %>%
   mutate(
     ALQ121 = if_else(RIDAGEYR < 18, 0, ALQ121),  # Assign 0 for age < 18
@@ -289,12 +261,7 @@ data <- data %>%
     )
   )
 
-data %>%
-  group_by(alcohol_frequency) %>%
-  summarise(count = n())
-```
-## Diabete
-```{r}
+########### Diabete ###########
 data <- data %>%
   mutate(
     diabetes_status = case_when(
@@ -304,16 +271,11 @@ data <- data %>%
       DIQ010 == 7 ~ NA_character_, # "Refused"
       DIQ010 == 9 ~ NA_character_, # "Don't know"
       is.na(DIQ010) ~ NA_character_  # Handle missing values
-    )
-  )
+    ))
 
-data %>%
-  group_by(diabetes_status) %>%
-  summarise(count = n())
 
-```
-## Second hand smoke
-```{r}
+
+########### Second hand smoke ########### 
 data <- data %>%
   mutate(
     household_smoking_status = case_when(
@@ -326,15 +288,11 @@ data <- data %>%
     )
   )
 
-data %>%
-  group_by(household_smoking_status) %>%
-  summarise(count = n())
-```
 
-## Fast food
-add the range of values together, from 0 - 90, if added value over 90, or either one is 6666, mark it as 90+, if either one is 7777 or 9999 and the other is 0 - 90 or 6666, use the other value. If both are 7777 or 9999, make as 7777 or 9999 correspsoned
 
-```{r}
+########### Fast food ########### 
+# add the range of values together, from 0 - 90, if added value over 90, or either one is 6666, mark it as 90+, if either one is 7777 or 9999 and the other is 0 - 90 or 6666, use the other value. If both are 7777 or 9999, make as 7777 or 9999 correspsoned
+
 data <- data %>%
   rowwise() %>%
   mutate(
@@ -358,12 +316,8 @@ data <- data %>%
   ) %>%
   ungroup()
 
-data %>%
-  group_by(fast_food_consumption) %>%
-  summarise(count = n())
-```
-## sleep time
-```{r}
+
+########### sleep time ########### 
 # Convert time to decimal hours
 time_to_decimal <- function(time) {
   ifelse(
@@ -397,42 +351,12 @@ data <- data %>%
     sleep_hours = (5 * sleep_hours_weekdays + 2 * sleep_hours_weekends) / 7
   )
 
-
-
-# Histogram for weighted sleep hours
-data %>%
-  mutate(
-    sleep_hours = as.numeric(as.character(sleep_hours))  # Convert other labels to numeric
-  ) %>% 
-  filter(!is.na(sleep_hours)) %>%
-  ggplot(aes(x = sleep_hours)) +
-  geom_histogram(binwidth = 0.5, fill = "blue", color = "black", alpha = 0.7) +
-  labs(
-    title = "Histogram of Weighted Sleep Hours",
-    x = "Weighted Sleep Hours",
-    y = "Frequency"
-  ) +
-  scale_x_continuous(breaks = seq(2, 15, by = 1)) +  # Adjust x-axis breaks
-  theme_minimal()
-
-
 ```
-
-
-```{r}
-data %>% 
-  select(sleep_hours, RIDAGEYR) %>% 
-  filter(RIDAGEYR >= 16) %>% # data only collected for people >= 16
-  is.na() %>% sum()
-```
-
-
-
 
 ## check age distribution
 
 ```{r}
-data %>%   ggplot(aes(x = RIDAGEYR)) +
+data %>% ggplot(aes(x = RIDAGEYR)) +
   geom_histogram(binwidth = 10, fill = "blue", color = "black", alpha = 0.7) +
   labs(
     title = "Histogram of Weighted Sleep Hours",
@@ -465,7 +389,8 @@ summary(agg_data)
 str(agg_data)
 ```
 
-NA SUmmary
+## Missingness
+NA Summary
 ```{r}
 data.frame(
   NA_Count = colSums(is.na(agg_data)),
@@ -486,6 +411,30 @@ summary(final_data)
 # Check data structure
 str(final_data)
 ```
+## factorize Ordinal Variables 
+```{r}
+final_data <- final_data %>%
+  mutate(bmi_category = factor(bmi_category, 
+      levels = c("Underweight", "Normal", "Overweight", "Obesity"), 
+      ordered = TRUE)) %>%
+  mutate(milk_type = factor(
+      milk_type, 
+      levels = c("0", "1", "2", "3", '4', '8', '9'), 
+      ordered = TRUE)) %>%
+  mutate(milk_consumption = factor(
+      milk_consumption, 
+      levels = c("0", "1", "2", "3", '9'), 
+      ordered = TRUE))
 
+final_data <- final_data %>%
+  mutate(poverty_category = as.numeric(poverty_category)) %>%
+  mutate(alcohol_frequency = as.numeric(alcohol_frequency)) %>%
+  mutate(diabetes_status = as.numeric(diabetes_status)) %>%
+  mutate(household_smoking_status = as.numeric(household_smoking_status)) %>%
+  mutate(fast_food_consumption = as.numeric(fast_food_consumption))
+```
+
+
+## realtionship between variable of interest
 
 
