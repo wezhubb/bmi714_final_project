@@ -150,15 +150,34 @@ Smoking(SMD460)
 Diabetes(DIQ010)
 Alcohol consumption(ALQ121)
 
-Goal: how socioeconmic state (income), eating behaviour affect obesity (weight)
+Goal: how socioeconmic state (income), eating behaviour affect obesity (BMI)
 
 # Prep data
 ```{r}
 data <- nhanes %>% 
-  select(BMXWT, DBQ197, DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, DBD905, DBD910, INDFMMPC, SLQ300, SLQ310, SLQ320, SLQ330, SMD460, DIQ010, ALQ121, RIDAGEYR) %>% # select variables
-  filter(!is.na(BMXWT)) # remove rows with missing weight
+  select(	
+BMXBMI, DBQ197, DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, DBD905, DBD910, INDFMMPC, SLQ300, SLQ310, SLQ320, SLQ330, SMD460, DIQ010, ALQ121, RIDAGEYR) %>% # select variables
+  filter(!is.na(	
+BMXBMI)) %>% # remove rows with missing weight
+filter(RIDAGEYR >= 18) # remove rows with age < 16)
 
 ```
+
+## BMI category
+according to https://www.cdc.gov/bmi/adult-calculator/bmi-categories.html
+```{r}
+data <- data %>%
+  mutate(
+    bmi_category = case_when(
+      BMXBMI < 18.5 ~ "Underweight",
+      BMXBMI >= 18.5 & BMXBMI < 25 ~ "Normal",
+      BMXBMI >= 25 & BMXBMI < 30 ~ "Overweight",
+      BMXBMI >= 30 ~ "Obesity",
+      TRUE ~ NA_character_  # Handle missing or unexpected BMI values
+    )
+  )
+```
+
 
 ## Type of Milk
 For Type of Milk DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, we will combine them into one variable. 
@@ -175,6 +194,11 @@ data %>%
   filter(multiple_values) %>%
   select(multiple_values, DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, milk_type)
 ```
+ 
+```{r}
+ nrow(data)
+```
+ 
  want to see combined effect of drinking mupltiple type of milk: Group participants who drink multiple types of milk into a single “Mixed Milk” category.
 
 ```{r}
@@ -187,43 +211,34 @@ data <- data %>%
 
 # rename milk_type
 data <- data %>% mutate(milk_type = case_when(
-  milk_type == "10" ~ "Whole",
-  milk_type == "11" ~ "2%",
-  milk_type == "12" ~ "Low Fat", # 1% or 0.5%
-  milk_type == "13" ~ "Skim",
-  milk_type == "14" ~ "Soy",
-  milk_type == "30" ~ "Other",
-  milk_type == "Mixed Milk" ~ "Mixed Milk",
-  milk_type == "77" ~ "Refused",
-  milk_type == "99" ~ "Unknown",
-  TRUE ~ "Missing" # NA into Unknown
+  milk_type == "10" ~ '4', #Whole
+  milk_type == "11" ~ '3', #2%
+  milk_type == "12" ~ '1', # 1% or 0.5%
+  milk_type == "13" ~ '0', #Skim
+  milk_type == "14" ~ '2', #Soy, ~ 1.5%-2% 
+  milk_type == "30" ~ NA_character_, #Other
+  milk_type == "Mixed Milk" ~ '9', #Mixed Milk
+  milk_type == "77" ~ NA_character_, #Refused
+  milk_type == "99" ~ NA_character_, #Unknown
+  TRUE ~ NA_character_ # NA into Unknown
 ))
 ```
 
-Check how many is unknown
-```{r}
-data %>% 
-  summarize(
-    total_row = n(),
-    unknown_milk = sum(milk_type == "Unknown"),
-    missing_milk = sum(milk_type == "Missing"),
-    percentage = (sum(milk_type == "Unknown" | milk_type == "Missing" ) / n()) * 100
-  )
-```
+
 
 ## Milk consumption 
 ```{r}
 data <- data %>%
   mutate(
     milk_consumption = case_when(
-      DBQ197 == 0 ~ "Never",
-      DBQ197 == 1 ~ "Rarely", #less than once a week
-      DBQ197 == 2 ~ "Sometimes", #once a week or more, but less than once a day
-      DBQ197 == 3 ~ "Often", # once a day or more
-      DBQ197 == 4 ~ "Varied",
-      DBQ197 == 7 ~ "Refused",
-      DBQ197 == 9 ~ "Unknow",
-      is.na(DBQ197) ~ "Missing"  # Handle missing values
+      DBQ197 == 0 ~ '0', #Never
+      DBQ197 == 1 ~ '1', #less than once a week
+      DBQ197 == 2 ~ '2', #once a week or more, but less than once a day
+      DBQ197 == 3 ~ '3', # once a day or more
+      DBQ197 == 4 ~ '9', #Varied
+      DBQ197 == 7 ~ NA_character_, #Refused
+      DBQ197 == 9 ~ NA_character_, #Unknow
+      is.na(DBQ197) ~ NA_character_  # Handle missing values
     )
   ) 
 
@@ -237,12 +252,12 @@ data %>%
 data <- data %>%
   mutate(
     poverty_category = case_when(
-      INDFMMPC == 1 ~ "<= 1.30", #Monthly poverty level index
-      INDFMMPC == 2 ~ "> 1.30, <= 1.85",
-      INDFMMPC == 3 ~ " > 1.85",
-      INDFMMPC == 7 ~ "Refused",
-      INDFMMPC == 9 ~ "Don't know",
-      is.na(INDFMMPC) ~ "Missing"  
+      INDFMMPC == 1 ~ '1', #Monthly poverty level index <= 1.30
+      INDFMMPC == 2 ~ '2',# 1.30 < Monthly poverty level index <= 1.85
+      INDFMMPC == 3 ~ '3', #> 1.85
+      INDFMMPC == 7 ~ NA_character_, #Refused
+      INDFMMPC == 9 ~ NA_character_, #"Don't know"
+      is.na(INDFMMPC) ~ NA_character_  
     )
   )
 
@@ -257,20 +272,20 @@ data <- data %>%
   mutate(
     ALQ121 = if_else(RIDAGEYR < 18, 0, ALQ121),  # Assign 0 for age < 18
     alcohol_frequency = case_when(
-      ALQ121 == 0 ~ "Never in the last year",
-      ALQ121 == 1 ~ "Every day",
-      ALQ121 == 2 ~ "Nearly every day",
-      ALQ121 == 3 ~ "3 to 4 times a week",
-      ALQ121 == 4 ~ "2 times a week",
-      ALQ121 == 5 ~ "Once a week",
-      ALQ121 == 6 ~ "2 to 3 times a month",
-      ALQ121 == 7 ~ "Once a month",
-      ALQ121 == 8 ~ "7 to 11 times in the last year",
-      ALQ121 == 9 ~ "3 to 6 times in the last year",
-      ALQ121 == 10 ~ "1 to 2 times in the last year",
-      ALQ121 == 77 ~ "Refused",
-      ALQ121 == 99 ~ "Don't know",
-      is.na(ALQ121) ~ "Missing"
+      ALQ121 == 0 ~ '0', #"Never in the last year"
+      ALQ121 == 1 ~ '10', #"Every day"
+      ALQ121 == 2 ~ '9', #Nearly every day"
+      ALQ121 == 3 ~ '8', #"3 to 4 times a week"
+      ALQ121 == 4 ~ '7', #"2 times a week"
+      ALQ121 == 5 ~ '6', #Once a week
+      ALQ121 == 6 ~ '5', #2 to 3 times a month
+      ALQ121 == 7 ~ '4', #Once a month
+      ALQ121 == 8 ~ '3', #7 to 11 times in the last year
+      ALQ121 == 9 ~ '2', #3 to 6 times in the last year
+      ALQ121 == 10 ~ '1', #1 to 2 times in the last year
+      ALQ121 == 77 ~ NA_character_, #"Refused"
+      ALQ121 == 99 ~ NA_character_, #"Don't know"
+      is.na(ALQ121) ~ NA_character_
     )
   )
 
@@ -283,12 +298,12 @@ data %>%
 data <- data %>%
   mutate(
     diabetes_status = case_when(
-      DIQ010 == 1 ~ "Yes",
-      DIQ010 == 2 ~ "No",
-      DIQ010 == 3 ~ "Borderline",
-      DIQ010 == 7 ~ "Refused",
-      DIQ010 == 9 ~ "Don't know",
-      is.na(DIQ010) ~ "Missing"  # Handle missing values
+      DIQ010 == 1 ~ '1', #Yes
+      DIQ010 == 2 ~ '0', #No
+      DIQ010 == 3 ~ '0.5', #Borderline
+      DIQ010 == 7 ~ NA_character_, # "Refused"
+      DIQ010 == 9 ~ NA_character_, # "Don't know"
+      is.na(DIQ010) ~ NA_character_  # Handle missing values
     )
   )
 
@@ -302,12 +317,12 @@ data %>%
 data <- data %>%
   mutate(
     household_smoking_status = case_when(
-      SMD460 == 0 ~ "No one in household is a smoker",
-      SMD460 == 1 ~ "1 household member is a smoker",
-      SMD460 == 2 ~ "2 or more household members are smokers",
-      SMD460 == 777 ~ "Refused",
-      SMD460 == 999 ~ "Don't know",
-      is.na(SMD460) ~ "Missing"  # Handle missing values
+      SMD460 == 0 ~ '0', #No one in household is a smoker
+      SMD460 == 1 ~ '1', #1 household member is a smoker
+      SMD460 == 2 ~ '2', #2 or more household members are smokers
+      SMD460 == 777 ~ NA_character_, #Refused
+      SMD460 == 999 ~ NA_character_, #"Don't know"
+      is.na(SMD460) ~ NA_character_  # Handle missing values
     )
   )
 
@@ -324,11 +339,11 @@ data <- data %>%
   rowwise() %>%
   mutate(
     fast_food_consumption = case_when(
-      # If either value is 6666 (More than 90 times), mark as "90+"
-      DBD905 == 6666 | DBD910 == 6666 ~ "90+",
+      # If either value is 6666 (More than 90 times), mark as "99"
+      DBD905 == 6666 | DBD910 == 6666 ~ "99",
       
-      # If the sum of values exceeds 90, mark as "90+"
-      sum(c(DBD905, DBD910), na.rm = TRUE) > 90 ~ "90+",
+      # If the sum of values exceeds 90, mark as "99"
+      sum(c(DBD905, DBD910), na.rm = TRUE) > 90 ~ "99",
       
       # If one value is 7777 or 9999 and the other is 0-90 or 6666, use the valid value
       DBD905 %in% c(7777, 9999) & DBD910 %in% c(0:90, 6666) ~ as.character(DBD910),
@@ -410,12 +425,7 @@ data %>%
   filter(RIDAGEYR >= 16) %>% # data only collected for people >= 16
   is.na() %>% sum()
 ```
-```{r}
-data %>% 
-  select(sleep_hours, RIDAGEYR) %>% 
-  filter(RIDAGEYR < 16) %>%
-  is.na() %>% sum()
-```
+
 
 
 
@@ -436,9 +446,9 @@ data %>%   ggplot(aes(x = RIDAGEYR)) +
 ## AGG data
 ```{r}
 agg_data <- data %>%
-  select(BMXWT, RIDAGEYR, milk_type, milk_consumption, poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours) %>%
+  select(BMXBMI, bmi_category, RIDAGEYR, milk_type, milk_consumption, poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours) %>%
   rename(
-    weight = BMXWT,
+    bmi = BMXBMI,
     age = RIDAGEYR
   )
 
@@ -453,11 +463,14 @@ summary(agg_data)
 
 # Check data structure
 str(agg_data)
-
-# Check for missing values
-colSums(is.na(agg_data))
 ```
 
+NA SUmmary
+```{r}
+data.frame(
+  NA_Count = colSums(is.na(agg_data)),
+  NA_Percentage = colSums(is.na(agg_data)) / nrow(agg_data) * 100
+)
 
-
+```
 
