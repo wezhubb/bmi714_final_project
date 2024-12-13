@@ -21,6 +21,7 @@ knitr::knit_engines$set(txt = function(options) {
 # Load Library here
 library(dplyr)
 library(ggplot2)
+library(lubridate)
 ```
 
 # View Data
@@ -77,7 +78,7 @@ nhanes %>%
 
 
 ```{r}
-nhanes %>% select(RIDAGEYR) %>% is.na() %>% sum()
+nhanes %>% select(BMXWT) %>% is.na() %>% sum()
 ```
 ## independent variable consideration
 variable details in nhanes website: https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020
@@ -100,19 +101,19 @@ Caffeine: caffeine with weight loss: https://pubmed.ncbi.nlm.nih.gov/30335479/
 caffeine_rows <- nhanes_var_name[grep("milk", nhanes_var_name$Variable_Description, ignore.case = TRUE), ]
 ```
 
-Income(INDFMMPC): https://pubmed.ncbi.nlm.nih.gov/29306894/
+Income(INDFMMPC: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_INQ.htm#INDFMMPC): https://pubmed.ncbi.nlm.nih.gov/29306894/
 
-Sleep(SLQ300, SLQ310, SLQ320, SLQ330):https://pmc.ncbi.nlm.nih.gov/articles/PMC9031614/
+Sleep(SLQ300, SLQ310, SLQ320, SLQ330: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_SLQ.htm#SLD012):https://pmc.ncbi.nlm.nih.gov/articles/PMC9031614/
 
-Smoking(SMD460): https://pubmed.ncbi.nlm.nih.gov/7039293/
+Smoking(SMD460: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_SMQFAM.htm#SMD460): https://pubmed.ncbi.nlm.nih.gov/7039293/
 
 Diabetes(DIQ010: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DIQ.htm#DIQ010): https://www.baptisthealth.com/blog/family-health/does-diabetes-cause-weight-loss-or-weight-gain
 
-Frozen meals/ready to go meal/fast food/resturation: 可以细分(DBD895, DBD905, DBD910): https://pmc.ncbi.nlm.nih.gov/articles/PMC4302389/
+Frozen meals/ready to go meal/fast food/resturation: (DBD905, DBD910: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBD905): https://pmc.ncbi.nlm.nih.gov/articles/PMC4302389/
 
 race(RIDRETH3, https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DEMO.htm#RIDRETH1): https://pmc.ncbi.nlm.nih.gov/articles/PMC3464818/
 
-Alcohol consumption(ALQ111: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_ALQ.htm#ALQ121): 
+Alcohol consumption(ALQ121: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_ALQ.htm#ALQ121): 
 - note: the data only ask this question for people 18 age and up. Should we classify people below don't consumption any alcohol?
 Missing: 
 ```{r}
@@ -133,3 +134,330 @@ protein(DR2TPROT) , carb (DR2TCARB), fat (DR2TTFAT) intake:
  - 每个都是3673/14300 missing
  - continuous variable
  - present in doc not in the dataset?
+
+
+# Variable Choosen: 
+Dependent variable: 
+weight(BMXWT)
+
+Independent variable:
+Dairy product used(DBQ197)
+Type of Milk(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U)
+Frozen meals/ready to go meal/fast food/resturation (DBD905, DBD910)
+Income(INDFMMPC)
+Sleep(SLQ300, SLQ310, SLQ320, SLQ330)
+Smoking(SMD460)
+Diabetes(DIQ010)
+Alcohol consumption(ALQ121)
+
+Goal: how socioeconmic state (income), eating behaviour affect obesity (weight)
+
+# Prep data
+```{r}
+data <- nhanes %>% 
+  select(BMXWT, DBQ197, DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, DBD905, DBD910, INDFMMPC, SLQ300, SLQ310, SLQ320, SLQ330, SMD460, DIQ010, ALQ121, RIDAGEYR) %>% # select variables
+  filter(!is.na(BMXWT)) # remove rows with missing weight
+
+```
+
+## Type of Milk
+For Type of Milk DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, we will combine them into one variable. 
+
+```{r}
+# check for how many people drink more than one type of milk
+data %>% 
+  rowwise() %>%  # Enable row-wise operations
+  mutate(
+    milk_type = coalesce(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U),  # Combine into one column
+    multiple_values = sum(!is.na(c(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U))) > 1  # Flag rows with multiple values
+  ) %>%
+  ungroup() %>%  # Remove row-wise grouping after calculations 
+  filter(multiple_values) %>%
+  select(multiple_values, DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, milk_type)
+```
+ want to see combined effect of drinking mupltiple type of milk: Group participants who drink multiple types of milk into a single “Mixed Milk” category.
+
+```{r}
+data <- data %>%
+  rowwise() %>%
+  mutate(milk_type = if_else(sum(!is.na(c(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U))) > 1, 
+                             "Mixed Milk", 
+                             as.character(coalesce(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U)))) %>%
+  ungroup()
+
+# rename milk_type
+data <- data %>% mutate(milk_type = case_when(
+  milk_type == "10" ~ "Whole",
+  milk_type == "11" ~ "2%",
+  milk_type == "12" ~ "Low Fat", # 1% or 0.5%
+  milk_type == "13" ~ "Skim",
+  milk_type == "14" ~ "Soy",
+  milk_type == "30" ~ "Other",
+  milk_type == "Mixed Milk" ~ "Mixed Milk",
+  milk_type == "77" ~ "Refused",
+  milk_type == "99" ~ "Unknown",
+  TRUE ~ "Missing" # NA into Unknown
+))
+```
+
+Check how many is unknown
+```{r}
+data %>% 
+  summarize(
+    total_row = n(),
+    unknown_milk = sum(milk_type == "Unknown"),
+    missing_milk = sum(milk_type == "Missing"),
+    percentage = (sum(milk_type == "Unknown" | milk_type == "Missing" ) / n()) * 100
+  )
+```
+
+## Milk consumption 
+```{r}
+data <- data %>%
+  mutate(
+    milk_consumption = case_when(
+      DBQ197 == 0 ~ "Never",
+      DBQ197 == 1 ~ "Rarely", #less than once a week
+      DBQ197 == 2 ~ "Sometimes", #once a week or more, but less than once a day
+      DBQ197 == 3 ~ "Often", # once a day or more
+      DBQ197 == 4 ~ "Varied",
+      DBQ197 == 7 ~ "Refused",
+      DBQ197 == 9 ~ "Unknow",
+      is.na(DBQ197) ~ "Missing"  # Handle missing values
+    )
+  ) 
+
+data %>%
+  group_by(milk_consumption) %>%
+  summarise(count = n())
+```
+
+## Income
+```{r}
+data <- data %>%
+  mutate(
+    poverty_category = case_when(
+      INDFMMPC == 1 ~ "<= 1.30", #Monthly poverty level index
+      INDFMMPC == 2 ~ "> 1.30, <= 1.85",
+      INDFMMPC == 3 ~ " > 1.85",
+      INDFMMPC == 7 ~ "Refused",
+      INDFMMPC == 9 ~ "Don't know",
+      is.na(INDFMMPC) ~ "Missing"  
+    )
+  )
+
+data %>%
+  group_by(poverty_category) %>%
+  summarise(count = n())
+```
+
+# Alcohol
+```{r}
+data <- data %>%
+  mutate(
+    ALQ121 = if_else(RIDAGEYR < 18, 0, ALQ121),  # Assign 0 for age < 18
+    alcohol_frequency = case_when(
+      ALQ121 == 0 ~ "Never in the last year",
+      ALQ121 == 1 ~ "Every day",
+      ALQ121 == 2 ~ "Nearly every day",
+      ALQ121 == 3 ~ "3 to 4 times a week",
+      ALQ121 == 4 ~ "2 times a week",
+      ALQ121 == 5 ~ "Once a week",
+      ALQ121 == 6 ~ "2 to 3 times a month",
+      ALQ121 == 7 ~ "Once a month",
+      ALQ121 == 8 ~ "7 to 11 times in the last year",
+      ALQ121 == 9 ~ "3 to 6 times in the last year",
+      ALQ121 == 10 ~ "1 to 2 times in the last year",
+      ALQ121 == 77 ~ "Refused",
+      ALQ121 == 99 ~ "Don't know",
+      is.na(ALQ121) ~ "Missing"
+    )
+  )
+
+data %>%
+  group_by(alcohol_frequency) %>%
+  summarise(count = n())
+```
+## Diabete
+```{r}
+data <- data %>%
+  mutate(
+    diabetes_status = case_when(
+      DIQ010 == 1 ~ "Yes",
+      DIQ010 == 2 ~ "No",
+      DIQ010 == 3 ~ "Borderline",
+      DIQ010 == 7 ~ "Refused",
+      DIQ010 == 9 ~ "Don't know",
+      is.na(DIQ010) ~ "Missing"  # Handle missing values
+    )
+  )
+
+data %>%
+  group_by(diabetes_status) %>%
+  summarise(count = n())
+
+```
+## Second hand smoke
+```{r}
+data <- data %>%
+  mutate(
+    household_smoking_status = case_when(
+      SMD460 == 0 ~ "No one in household is a smoker",
+      SMD460 == 1 ~ "1 household member is a smoker",
+      SMD460 == 2 ~ "2 or more household members are smokers",
+      SMD460 == 777 ~ "Refused",
+      SMD460 == 999 ~ "Don't know",
+      is.na(SMD460) ~ "Missing"  # Handle missing values
+    )
+  )
+
+data %>%
+  group_by(household_smoking_status) %>%
+  summarise(count = n())
+```
+
+## Fast food
+add the range of values together, from 0 - 90, if added value over 90, or either one is 6666, mark it as 90+, if either one is 7777 or 9999 and the other is 0 - 90 or 6666, use the other value. If both are 7777 or 9999, make as 7777 or 9999 correspsoned
+
+```{r}
+data <- data %>%
+  rowwise() %>%
+  mutate(
+    fast_food_consumption = case_when(
+      # If either value is 6666 (More than 90 times), mark as "90+"
+      DBD905 == 6666 | DBD910 == 6666 ~ "90+",
+      
+      # If the sum of values exceeds 90, mark as "90+"
+      sum(c(DBD905, DBD910), na.rm = TRUE) > 90 ~ "90+",
+      
+      # If one value is 7777 or 9999 and the other is 0-90 or 6666, use the valid value
+      DBD905 %in% c(7777, 9999) & DBD910 %in% c(0:90, 6666) ~ as.character(DBD910),
+      DBD910 %in% c(7777, 9999) & DBD905 %in% c(0:90, 6666) ~ as.character(DBD905),
+      
+      # If both are 7777 or 9999, retain the corresponding value
+      DBD905 %in% c(7777, 9999) & DBD910 %in% c(7777, 9999) ~ as.character(max(DBD905, DBD910)),
+      
+      # Otherwise, add the values (if both are 0-90) and return the sum
+      TRUE ~ as.character(sum(c(DBD905, DBD910), na.rm = TRUE))
+    )
+  ) %>%
+  ungroup()
+
+data %>%
+  group_by(fast_food_consumption) %>%
+  summarise(count = n())
+```
+## sleep time
+```{r}
+# Convert time to decimal hours
+time_to_decimal <- function(time) {
+  ifelse(
+    time %in% c("77777", "99999") | is.na(time),
+    NA,
+    as.numeric(hms(paste0(time, ":00"))) / 3600
+  )
+}
+
+data <- data %>%
+  mutate(
+    # Convert sleep and wake times to decimal hours
+    sleep_weekdays = time_to_decimal(SLQ300),
+    wake_weekdays = time_to_decimal(SLQ310),
+    sleep_weekends = time_to_decimal(SLQ320),
+    wake_weekends = time_to_decimal(SLQ330),
+    
+    # Calculate sleep hours, accounting for crossing midnight
+    sleep_hours_weekdays = case_when(
+      !is.na(sleep_weekdays) & !is.na(wake_weekdays) ~ 
+        ifelse(wake_weekdays < sleep_weekdays, wake_weekdays + 24 - sleep_weekdays, wake_weekdays - sleep_weekdays),
+      TRUE ~ NA_real_
+    ),
+    sleep_hours_weekends = case_when(
+      !is.na(sleep_weekends) & !is.na(wake_weekends) ~ 
+        ifelse(wake_weekends < sleep_weekends, wake_weekends + 24 - sleep_weekends, wake_weekends - sleep_weekends),
+      TRUE ~ NA_real_
+    ),
+    
+    # Calculate weighted sleep directly
+    sleep_hours = (5 * sleep_hours_weekdays + 2 * sleep_hours_weekends) / 7
+  )
+
+
+
+# Histogram for weighted sleep hours
+data %>%
+  mutate(
+    sleep_hours = as.numeric(as.character(sleep_hours))  # Convert other labels to numeric
+  ) %>% 
+  filter(!is.na(sleep_hours)) %>%
+  ggplot(aes(x = sleep_hours)) +
+  geom_histogram(binwidth = 0.5, fill = "blue", color = "black", alpha = 0.7) +
+  labs(
+    title = "Histogram of Weighted Sleep Hours",
+    x = "Weighted Sleep Hours",
+    y = "Frequency"
+  ) +
+  scale_x_continuous(breaks = seq(2, 15, by = 1)) +  # Adjust x-axis breaks
+  theme_minimal()
+
+
+```
+
+
+```{r}
+data %>% 
+  select(sleep_hours, RIDAGEYR) %>% 
+  filter(RIDAGEYR >= 16) %>% # data only collected for people >= 16
+  is.na() %>% sum()
+```
+```{r}
+data %>% 
+  select(sleep_hours, RIDAGEYR) %>% 
+  filter(RIDAGEYR < 16) %>%
+  is.na() %>% sum()
+```
+
+
+
+## check age distribution
+
+```{r}
+data %>%   ggplot(aes(x = RIDAGEYR)) +
+  geom_histogram(binwidth = 10, fill = "blue", color = "black", alpha = 0.7) +
+  labs(
+    title = "Histogram of Weighted Sleep Hours",
+    x = "Weighted Sleep Hours",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+
+## AGG data
+```{r}
+agg_data <- data %>%
+  select(BMXWT, RIDAGEYR, milk_type, milk_consumption, poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours) %>%
+  rename(
+    weight = BMXWT,
+    age = RIDAGEYR
+  )
+
+head(agg_data)
+  
+```
+
+# Exploratory Data Analysis
+```{r}
+# Summary of data
+summary(agg_data)
+
+# Check data structure
+str(agg_data)
+
+# Check for missing values
+colSums(is.na(agg_data))
+```
+
+
+
+
