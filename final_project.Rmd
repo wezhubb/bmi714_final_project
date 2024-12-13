@@ -216,7 +216,7 @@ data <- data %>% mutate(milk_type = case_when(
   milk_type == "12" ~ '1', # 1% or 0.5%
   milk_type == "13" ~ '0', #Skim
   milk_type == "14" ~ '2', #Soy, ~ 1.5%-2% 
-  milk_type == "30" ~ NA_character_, #Other
+  milk_type == "30" ~ '8', #Other
   milk_type == "Mixed Milk" ~ '9', #Mixed Milk
   milk_type == "77" ~ NA_character_, #Refused
   milk_type == "99" ~ NA_character_, #Unknown
@@ -473,4 +473,19 @@ data.frame(
 )
 
 ```
+
+```{r}
+final_data <- agg_data %>%
+  filter(!is.na(milk_type), !is.na(milk_consumption), !is.na(poverty_category), !is.na(alcohol_frequency), !is.na(diabetes_status), !is.na(household_smoking_status), !is.na(fast_food_consumption), !is.na(sleep_hours))
+```
+
+```{r}
+# Summary of data
+summary(final_data)
+
+# Check data structure
+str(final_data)
+```
+
+
 
