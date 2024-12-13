@@ -45,14 +45,91 @@ nhanes_var_name %>% select(Data_File_Description) %>% unique()
 
 weight in kg: BMXWT
 ```{r}
-nhanes %>% select(BMXWT) %>% is.na() %>% sum()
+# Calculate the percentage of missing values for each column
+missing_percent <- colSums(is.na(nhanes)) / nrow(nhanes)
+
+# Filter columns with less than 10% missingness
+filtered_df <- nhanes[, missing_percent < 0.20]
+dim(filtered_df)
+```
+
+```{r}
+# Extract the column names from the filtered dataset
+filtered_columns <- colnames(filtered_df)
+
+# Filter var_dict for rows where col_name matches the filtered column names
+filtered_var_dict <- nhanes_var_name[nhanes_var_name$Variable_Name %in% filtered_columns, ]
+```
+
+```{r}
+nhanes %>% 
+  select(ALQ111, RIDAGEYR) %>% 
+  filter(RIDAGEYR > 18) %>%
+  filter(rowSums(is.na(.)) == 1) %>%  # Check if all selected columns are NA
+  nrow()
+```
+
+```{r}
+nhanes %>% 
+  select(ALQ111, RIDAGEYR) %>% 
+  filter(RIDAGEYR > 18)
 ```
 
 
+```{r}
+nhanes %>% select(RIDAGEYR) %>% is.na() %>% sum()
+```
 ## independent variable consideration
-Dairy porduct used: Greater consumption of total dairy products prevention of weight gain in middle-aged and elderly women who are initially normal weight. https://pmc.ncbi.nlm.nih.gov/articles/PMC4807700/
+variable details in nhanes website: https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020
 
-Type of Milk: 1%/skim milk is more common among overweight/obese preschoolers, potentially reflecting the choice of parents to give overweight/obese children low-fat milk to drink. Nevertheless, 1%/skim milk does not appear to restrain body weight gain between 2–4 years in this age range, emphasizing a need for weight-targeted recommendations with a greater evidence basis. https://pmc.ncbi.nlm.nih.gov/articles/PMC4439101/
+Dairy product used(DBQ197: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBQ197): Greater consumption of total dairy products prevention of weight gain in middle-aged and elderly women who are initially normal weight. https://pmc.ncbi.nlm.nih.gov/articles/PMC4807700/
+
+Type of Milk(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBQ223A): 1%/skim milk is more common among overweight/obese preschoolers, potentially reflecting the choice of parents to give overweight/obese children low-fat milk to drink. Nevertheless, 1%/skim milk does not appear to restrain body weight gain between 2–4 years in this age range, emphasizing a need for weight-targeted recommendations with a greater evidence basis. https://pmc.ncbi.nlm.nih.gov/articles/PMC4439101/
+Missingness:
+```{r}
+(nhanes %>% 
+  select(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U) %>% 
+  filter(rowSums(is.na(.)) == ncol(.)) %>%  # Check if all selected columns are NA
+  nrow()) / nrow(nhanes) # Count the number of such rows
+```
 
 
+Caffeine: caffeine with weight loss: https://pubmed.ncbi.nlm.nih.gov/30335479/
+ - high missingess: 15538/15560
+```{r}
+caffeine_rows <- nhanes_var_name[grep("milk", nhanes_var_name$Variable_Description, ignore.case = TRUE), ]
+```
 
+Income(INDFMMPC): https://pubmed.ncbi.nlm.nih.gov/29306894/
+
+Sleep(SLQ300, SLQ310, SLQ320, SLQ330):https://pmc.ncbi.nlm.nih.gov/articles/PMC9031614/
+
+Smoking(SMD460): https://pubmed.ncbi.nlm.nih.gov/7039293/
+
+Diabetes(DIQ010: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DIQ.htm#DIQ010): https://www.baptisthealth.com/blog/family-health/does-diabetes-cause-weight-loss-or-weight-gain
+
+Frozen meals/ready to go meal/fast food/resturation: 可以细分(DBD895, DBD905, DBD910): https://pmc.ncbi.nlm.nih.gov/articles/PMC4302389/
+
+race(RIDRETH3, https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DEMO.htm#RIDRETH1): https://pmc.ncbi.nlm.nih.gov/articles/PMC3464818/
+
+Alcohol consumption(ALQ111: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_ALQ.htm#ALQ121): 
+- note: the data only ask this question for people 18 age and up. Should we classify people below don't consumption any alcohol?
+Missing: 
+```{r}
+(nhanes %>% 
+  select(ALQ111, RIDAGEYR) %>% 
+  filter(RIDAGEYR > 18) %>%
+  filter(rowSums(is.na(.)) == 1) %>%
+  nrow()) / (
+nhanes %>% 
+  select(ALQ111, RIDAGEYR) %>% 
+  filter(RIDAGEYR > 18) %>% nrow())
+```
+
+
+protein(DR2TPROT) , carb (DR2TCARB), fat (DR2TTFAT) intake: 
+ - https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DR2TOT.htm#DR2TPROT
+ - can have more specific group
+ - 每个都是3673/14300 missing
+ - continuous variable
+ - present in doc not in the dataset?
