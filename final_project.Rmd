@@ -22,6 +22,8 @@ knitr::knit_engines$set(txt = function(options) {
 library(dplyr)
 library(ggplot2)
 library(lubridate)
+library(tidyr)
+library(ggcorrplot)
 ```
 
 # View Data
@@ -180,7 +182,7 @@ data <- data %>%
 
 
 ## Process independent variable
-
+Note: predictors are ordinal, encoding them to reflect their order.
 ```{r}
 ########### Type of Milk ###########
 # For Type of Milk DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, we will combine them into one variable. 
@@ -412,6 +414,7 @@ summary(final_data)
 str(final_data)
 ```
 ## factorize Ordinal Variables 
+predictors are ordinal, encoding them to reflect their order.
 ```{r}
 final_data <- final_data %>%
   mutate(bmi_category = factor(bmi_category, 
@@ -436,5 +439,161 @@ final_data <- final_data %>%
 
 
 ## realtionship between variable of interest
+```{r, fig.width=10, fig.height=10}
+custom_labels <- c(
+  "Underweight" = "Under\nWeight",
+  "Normal" = "Normal",
+  "Overweight" = "Over\nWeight",
+  "Obesity" = "Obesity"
+)
+
+facet_labels <- c(
+  "poverty_category" = "Poverty Category",
+  "alcohol_frequency" = "Alcohol Frequency",
+  "diabetes_status" = "Diabetes Status",
+  "household_smoking_status" = "Household Smoking Status",
+  "fast_food_consumption" = "Fast Food Consumption",
+  "sleep_hours" = "Hours of Sleep",
+  "milk_type" = "Milk Type",
+  "milk_consumption" = "Milk Consumption"
+)
+
+
+final_data %>%
+  mutate(
+    milk_type = as.numeric(as.character(milk_type)),
+    milk_consumption = as.numeric(as.character(milk_consumption))
+  ) %>%
+  pivot_longer(
+    cols = c(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  ggplot(aes(x = bmi_category, y = value, fill = bmi_category)) +
+  geom_boxplot(alpha = 0.7, outlier.color = "red")+
+  scale_x_discrete(labels = custom_labels) +
+  facet_wrap(~ variable, scales = "free_y", labeller = labeller(variable = facet_labels)) +
+  labs(
+    title = "Relationship Between Variables of Interest and BMI Categories",
+    x = "BMI Category",
+    y = "Variable of Interest Value"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    axis.text.y = element_text(size = 10),
+    axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+    strip.text = element_text(size = 12), # larger facet title
+    axis.title = element_text(size = 12, face = "bold")
+        )  
+```
+
+- no obvious outliers
+
+## correlation
+- ordinal variable
+- non-linear realtionship 
+-> use spearman correlation
+```{r}
+cor_matrix <- final_data %>%
+  select(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption) %>%
+  mutate(
+    milk_type = as.numeric(as.character(milk_type)),
+    milk_consumption = as.numeric(as.character(milk_consumption))
+  ) %>% 
+  cor(method = "spearman")
+
+# Visualize the correlation matrix
+
+ggcorrplot(cor_matrix, method = "circle", title = "Correlation Between Predictors")
+```
+```{r}
+predictors <- final_data %>%
+  select(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption) %>%
+  mutate(
+    milk_type = as.numeric(as.character(milk_type)),
+    milk_consumption = as.numeric(as.character(milk_consumption))
+  )
+
+results <- data.frame(
+  Var1 = character(),  # First variable
+  Var2 = character(),  # Second variable
+  Correlation = numeric(),
+  T_Statistic = numeric(),
+  P_Value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+for (i in 1:(ncol(predictors) - 1)) {
+  for (j in (i + 1):ncol(predictors)) {
+    # Get variable names
+    var1 <- colnames(predictors)[i]
+    var2 <- colnames(predictors)[j]
+    
+    # Perform correlation test
+    test <- cor.test(predictors[[var1]], predictors[[var2]], method = "pearson")  # Use "spearman" if needed
+    
+    # Extract statistics
+    correlation <- test$estimate
+    t_statistic <- test$statistic
+    p_value <- test$p.value
+    
+    # Store results in dataframe
+    results <- rbind(results, data.frame(
+      Var1 = var1,
+      Var2 = var2,
+      Correlation = correlation,
+      T_Statistic = t_statistic,
+      P_Value = p_value
+    ))
+  }
+}
+
+```
+
+```{r}
+
+results %>%
+  select(Var1, Var2, T_Statistic, P_Value) %>%
+  rowwise() %>%
+  mutate(Output = paste("For pair (", Var1, ", ", Var2, "): T-Statistic = ", T_Statistic, ", P-Value = ", P_Value, sep = "")) %>%
+  pull(Output) %>%
+  writeLines()
+```
+
+
+```{r}
+results$Bonferroni_Adjusted_P <- p.adjust(results$P_Value, method = "bonferroni")
+
+results %>%
+  select(Var1, Var2, T_Statistic, Bonferroni_Adjusted_P) %>%
+  rowwise() %>%
+  mutate(Output = paste("For pair (", Var1, ", ", Var2, "): T-Statistic = ", T_Statistic, ", Padj-Value = ", Bonferroni_Adjusted_P, sep = "")) %>%
+  pull(Output) %>%
+  writeLines()
+```
+## scale
+depend on model choosen
+
+## Transformation
+depend on model choosen
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
