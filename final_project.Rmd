@@ -8,7 +8,11 @@ output:
     toc_depth: 3
     toc_float: true
   pdf_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::knit_engines$set(txt = function(options) {
@@ -35,18 +39,15 @@ nhanes_var_name <- read.csv("data/BMI714_NHANES_VariableDictionary.csv", header 
 colnames(nhanes) <- ifelse(colnames(nhanes) %in% nhanes_var_name$BMI_714_Variable_Name, 
                            nhanes_var_name$Variable_Name[match(colnames(nhanes),nhanes_var_name$BMI_714_Variable_Name)], 
                            colnames(nhanes))  # Keep names unchanged if not in mapping
-
-
 nhanes %>% nrow()
 ```
 
-
 ```{r}
-nhanes_var_name %>% select(Data_File_Description) %>% unique()
+nhanes_var_name %>% dplyr::select(Data_File_Description) %>% unique()
 ```
 
-
 weight in kg: BMXWT
+
 ```{r}
 # Calculate the percentage of missing values for each column
 missing_percent <- colSums(is.na(nhanes)) / nrow(nhanes)
@@ -66,7 +67,7 @@ filtered_var_dict <- nhanes_var_name[nhanes_var_name$Variable_Name %in% filtered
 
 ```{r}
 nhanes %>% 
-  select(ALQ111, RIDAGEYR) %>% 
+  dplyr::select(ALQ111, RIDAGEYR) %>% 
   filter(RIDAGEYR > 18) %>%
   filter(rowSums(is.na(.)) == 1) %>%  # Check if all selected columns are NA
   nrow()
@@ -74,90 +75,112 @@ nhanes %>%
 
 ```{r}
 nhanes %>% 
-  select(ALQ111, RIDAGEYR) %>% 
+  dplyr::select(ALQ111, RIDAGEYR) %>% 
   filter(RIDAGEYR > 18)
 ```
 
-
 ```{r}
-nhanes %>% select(BMXWT) %>% is.na() %>% sum()
+nhanes %>% dplyr::select(BMXWT) %>% is.na() %>% sum()
 ```
+
 ## independent variable consideration
-variable details in nhanes website: https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020
 
-Dairy product used(DBQ197: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBQ197): Greater consumption of total dairy products prevention of weight gain in middle-aged and elderly women who are initially normal weight. https://pmc.ncbi.nlm.nih.gov/articles/PMC4807700/
+variable details in nhanes website:
+<https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020>
 
-Type of Milk(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBQ223A): 1%/skim milk is more common among overweight/obese preschoolers, potentially reflecting the choice of parents to give overweight/obese children low-fat milk to drink. Nevertheless, 1%/skim milk does not appear to restrain body weight gain between 2–4 years in this age range, emphasizing a need for weight-targeted recommendations with a greater evidence basis. https://pmc.ncbi.nlm.nih.gov/articles/PMC4439101/
+Dairy product used(DBQ197:
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBQ197>):
+Greater consumption of total dairy products prevention of weight gain in
+middle-aged and elderly women who are initially normal weight.
+<https://pmc.ncbi.nlm.nih.gov/articles/PMC4807700/>
+
+Type of Milk(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U:
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBQ223A>):
+1%/skim milk is more common among overweight/obese preschoolers,
+potentially reflecting the choice of parents to give overweight/obese
+children low-fat milk to drink. Nevertheless, 1%/skim milk does not
+appear to restrain body weight gain between 2–4 years in this age range,
+emphasizing a need for weight-targeted recommendations with a greater
+evidence basis. <https://pmc.ncbi.nlm.nih.gov/articles/PMC4439101/>
 Missingness:
+
 ```{r}
 (nhanes %>% 
-  select(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U) %>% 
+  dplyr::select(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U) %>% 
   filter(rowSums(is.na(.)) == ncol(.)) %>%  # Check if all selected columns are NA
   nrow()) / nrow(nhanes) # Count the number of such rows
 ```
 
+Caffeine: caffeine with weight loss:
+<https://pubmed.ncbi.nlm.nih.gov/30335479/> - high missingess:
+15538/15560
 
-Caffeine: caffeine with weight loss: https://pubmed.ncbi.nlm.nih.gov/30335479/
- - high missingess: 15538/15560
 ```{r}
 caffeine_rows <- nhanes_var_name[grep("milk", nhanes_var_name$Variable_Description, ignore.case = TRUE), ]
 ```
 
-Income(INDFMMPC: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_INQ.htm#INDFMMPC): https://pubmed.ncbi.nlm.nih.gov/29306894/
+Income(INDFMMPC:
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_INQ.htm#INDFMMPC>):
+<https://pubmed.ncbi.nlm.nih.gov/29306894/>
 
-Sleep(SLQ300, SLQ310, SLQ320, SLQ330: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_SLQ.htm#SLD012):https://pmc.ncbi.nlm.nih.gov/articles/PMC9031614/
+Sleep(SLQ300, SLQ310, SLQ320, SLQ330:
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_SLQ.htm#SLD012>):<https://pmc.ncbi.nlm.nih.gov/articles/PMC9031614/>
 
-Smoking(SMD460: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_SMQFAM.htm#SMD460): https://pubmed.ncbi.nlm.nih.gov/7039293/
+Smoking(SMD460:
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_SMQFAM.htm#SMD460>):
+<https://pubmed.ncbi.nlm.nih.gov/7039293/>
 
-Diabetes(DIQ010: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DIQ.htm#DIQ010): https://www.baptisthealth.com/blog/family-health/does-diabetes-cause-weight-loss-or-weight-gain
+Diabetes(DIQ010:
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DIQ.htm#DIQ010>):
+<https://www.baptisthealth.com/blog/family-health/does-diabetes-cause-weight-loss-or-weight-gain>
 
-Frozen meals/ready to go meal/fast food/resturation: (DBD905, DBD910: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBD905): https://pmc.ncbi.nlm.nih.gov/articles/PMC4302389/
+Frozen meals/ready to go meal/fast food/resturation: (DBD905, DBD910:
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBD905>):
+<https://pmc.ncbi.nlm.nih.gov/articles/PMC4302389/>
 
-race(RIDRETH3, https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DEMO.htm#RIDRETH1): https://pmc.ncbi.nlm.nih.gov/articles/PMC3464818/
+race(RIDRETH3,
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DEMO.htm#RIDRETH1>):
+<https://pmc.ncbi.nlm.nih.gov/articles/PMC3464818/>
 
-Alcohol consumption(ALQ121: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_ALQ.htm#ALQ121): 
-- note: the data only ask this question for people 18 age and up. Should we classify people below don't consumption any alcohol?
-Missing: 
+Alcohol consumption(ALQ121:
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_ALQ.htm#ALQ121>): -
+note: the data only ask this question for people 18 age and up. Should
+we classify people below don't consumption any alcohol? Missing:
+
 ```{r}
 (nhanes %>% 
-  select(ALQ111, RIDAGEYR) %>% 
+  dplyr::select(ALQ111, RIDAGEYR) %>% 
   filter(RIDAGEYR > 18) %>%
   filter(rowSums(is.na(.)) == 1) %>%
   nrow()) / (
 nhanes %>% 
-  select(ALQ111, RIDAGEYR) %>% 
+  dplyr::select(ALQ111, RIDAGEYR) %>% 
   filter(RIDAGEYR > 18) %>% nrow())
 ```
 
+protein(DR2TPROT) , carb (DR2TCARB), fat (DR2TTFAT) intake: -
+<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DR2TOT.htm#DR2TPROT> -
+can have more specific group - 每个都是3673/14300 missing - continuous
+variable - present in doc not in the dataset?
 
-protein(DR2TPROT) , carb (DR2TCARB), fat (DR2TTFAT) intake: 
- - https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DR2TOT.htm#DR2TPROT
- - can have more specific group
- - 每个都是3673/14300 missing
- - continuous variable
- - present in doc not in the dataset?
+# Variable Choosen:
 
+Dependent variable: weight(BMXWT)
 
-# Variable Choosen: 
-Dependent variable: 
-weight(BMXWT)
-
-Independent variable:
-Dairy product used(DBQ197)
-Type of Milk(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U)
-Frozen meals/ready to go meal/fast food/resturation (DBD905, DBD910)
-Income(INDFMMPC)
-Sleep(SLQ300, SLQ310, SLQ320, SLQ330)
-Smoking(SMD460)
-Diabetes(DIQ010)
+Independent variable: Dairy product used(DBQ197) Type of Milk(DBQ223A,
+DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U) Frozen meals/ready to go
+meal/fast food/resturation (DBD905, DBD910) Income(INDFMMPC)
+Sleep(SLQ300, SLQ310, SLQ320, SLQ330) Smoking(SMD460) Diabetes(DIQ010)
 Alcohol consumption(ALQ121)
 
-Goal: how socioeconmic state (income), eating behaviour affect obesity (BMI) in adult
+Goal: how socioeconmic state (income), eating behaviour affect obesity
+(BMI) in adult
 
 # Prep data
+
 ```{r}
 data <- nhanes %>% 
-  select(	
+  dplyr::select(	
 BMXBMI, DBQ197, DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, DBD905, DBD910, INDFMMPC, SLQ300, SLQ310, SLQ320, SLQ330, SMD460, DIQ010, ALQ121, RIDAGEYR) %>% # select variables
   filter(!is.na(	
 BMXBMI)) %>% # remove rows with missing weight
@@ -166,7 +189,10 @@ filter(RIDAGEYR >= 18) # remove rows with age < 16)
 ```
 
 ## BMI category
-according to https://www.cdc.gov/bmi/adult-calculator/bmi-categories.html
+
+according to
+<https://www.cdc.gov/bmi/adult-calculator/bmi-categories.html>
+
 ```{r}
 data <- data %>%
   mutate(
@@ -180,9 +206,10 @@ data <- data %>%
   )
 ```
 
-
 ## Process independent variable
+
 Note: predictors are ordinal, encoding them to reflect their order.
+
 ```{r}
 ########### Type of Milk ###########
 # For Type of Milk DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, we will combine them into one variable. 
@@ -368,11 +395,11 @@ data %>% ggplot(aes(x = RIDAGEYR)) +
   theme_minimal()
 ```
 
-
 ## AGG data
+
 ```{r}
 agg_data <- data %>%
-  select(BMXBMI, bmi_category, RIDAGEYR, milk_type, milk_consumption, poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours) %>%
+  dplyr::select(BMXBMI, bmi_category, RIDAGEYR, milk_type, milk_consumption, poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours) %>%
   rename(
     bmi = BMXBMI,
     age = RIDAGEYR
@@ -383,6 +410,7 @@ head(agg_data)
 ```
 
 # Exploratory Data Analysis
+
 ```{r}
 # Summary of data
 summary(agg_data)
@@ -392,7 +420,9 @@ str(agg_data)
 ```
 
 ## Missingness
+
 NA Summary
+
 ```{r}
 data.frame(
   NA_Count = colSums(is.na(agg_data)),
@@ -413,8 +443,11 @@ summary(final_data)
 # Check data structure
 str(final_data)
 ```
-## factorize Ordinal Variables 
+
+## factorize Ordinal Variables
+
 predictors are ordinal, encoding them to reflect their order.
+
 ```{r}
 final_data <- final_data %>%
   mutate(bmi_category = factor(bmi_category, 
@@ -437,8 +470,8 @@ final_data <- final_data %>%
   mutate(fast_food_consumption = as.numeric(fast_food_consumption))
 ```
 
-
 ## realtionship between variable of interest
+
 ```{r, fig.width=10, fig.height=10}
 custom_labels <- c(
   "Underweight" = "Under\nWeight",
@@ -489,15 +522,16 @@ final_data %>%
         )  
 ```
 
-- no obvious outliers
+-   no obvious outliers
 
 ## correlation
-- ordinal variable
-- non-linear realtionship 
--> use spearman correlation
+
+-   ordinal variable
+-   non-linear realtionship -\> use spearman correlation
+
 ```{r}
 cor_matrix <- final_data %>%
-  select(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption) %>%
+  dplyr::select(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption) %>%
   mutate(
     milk_type = as.numeric(as.character(milk_type)),
     milk_consumption = as.numeric(as.character(milk_consumption))
@@ -508,9 +542,10 @@ cor_matrix <- final_data %>%
 
 ggcorrplot(cor_matrix, method = "circle", title = "Correlation Between Predictors")
 ```
+
 ```{r}
 predictors <- final_data %>%
-  select(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption) %>%
+  dplyr::select(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption) %>%
   mutate(
     milk_type = as.numeric(as.character(milk_type)),
     milk_consumption = as.numeric(as.character(milk_consumption))
@@ -555,45 +590,243 @@ for (i in 1:(ncol(predictors) - 1)) {
 ```{r}
 
 results %>%
-  select(Var1, Var2, T_Statistic, P_Value) %>%
+  dplyr::select(Var1, Var2, T_Statistic, P_Value) %>%
   rowwise() %>%
   mutate(Output = paste("For pair (", Var1, ", ", Var2, "): T-Statistic = ", T_Statistic, ", P-Value = ", P_Value, sep = "")) %>%
   pull(Output) %>%
   writeLines()
 ```
 
-
 ```{r}
 results$Bonferroni_Adjusted_P <- p.adjust(results$P_Value, method = "bonferroni")
 
 results %>%
-  select(Var1, Var2, T_Statistic, Bonferroni_Adjusted_P) %>%
+  dplyr::select(Var1, Var2, T_Statistic, Bonferroni_Adjusted_P) %>%
   rowwise() %>%
   mutate(Output = paste("For pair (", Var1, ", ", Var2, "): T-Statistic = ", T_Statistic, ", Padj-Value = ", Bonferroni_Adjusted_P, sep = "")) %>%
   pull(Output) %>%
   writeLines()
 ```
+
 ## scale
-depend on model choosen
+```{r}
+# Scaling Continuous Variables
+final_data <- final_data %>%
+  mutate_at(vars(sleep_hours), 
+            scale)
+# Confirm Scaling
+summary(final_data)
+```
+
 
 ## Transformation
-depend on model choosen
+```{r}
+# # log transformation
+# final_data <- final_data %>%
+#   mutate(sleep_hours = log(sleep_hours + 1e-6))
+```
 
+# Model Building
 
+```{r}
+# Load Necessary Libraries
+if (!require("glmnet")) install.packages("glmnet")
+if (!require("caret")) install.packages("caret")
+if (!require("randomForest")) install.packages("randomForest")
+if (!require("ggplot2")) install.packages("ggplot2")
 
+library(glmnet)
+library(caret)
+library(randomForest)
+library(ggplot2)
 
+# Ensure target variable is a factor
+final_data$bmi_category <- as.factor(final_data$bmi_category)
 
+# Data Preparation and Scaling
+scale_columns <- c("sleep_hours", "fast_food_consumption", "poverty_category", 
+                   "alcohol_frequency", "diabetes_status", "household_smoking_status")
 
+final_data[scale_columns] <- scale(final_data[scale_columns])
 
+# Train-Test Split
+set.seed(123)
+train_index <- createDataPartition(final_data$bmi_category, p = 0.8, list = FALSE)
+train_data <- final_data[train_index, ]
+test_data <- final_data[-train_index, ]
 
+# Prepare Data for glmnet
+x <- model.matrix(bmi_category ~ ., data = final_data)[, -1]
+y <- as.factor(final_data$bmi_category)
+x_train <- x[train_index, ]
+y_train <- y[train_index]
+x_test <- x[-train_index, ]
+y_test <- y[-train_index]
 
+# Check Split
+cat("Training Rows:", nrow(train_data), "\nTesting Rows:", nrow(test_data), "\n")
 
+# --------------------------------------------------------------------
+# Hyperparameter Tuning for LASSO/Elastic Net
+# --------------------------------------------------------------------
+set.seed(123)
+alphas <- seq(0, 1, by = 0.1)  # Alpha grid: LASSO, Ridge, Elastic Net
+cv_results <- list()
 
+# Loop over alpha values
+for (a in alphas) {
+  lasso_model <- cv.glmnet(x_train, y_train, family = "multinomial", alpha = a, type.measure = "class")
+  cv_results[[paste0("alpha_", a)]] <- list(
+    lambda_min = lasso_model$lambda.min,
+    accuracy = min(lasso_model$cvm)
+  )
+}
 
+# Best Alpha
+best_alpha <- alphas[which.min(sapply(cv_results, function(x) x$accuracy))]
+cat("Best Alpha (Elastic Net):", best_alpha, "\n")
 
+# Train Final Model with Best Alpha
+set.seed(123)
+final_lasso_model <- cv.glmnet(x_train, y_train, family = "multinomial", alpha = best_alpha, type.measure = "class")
+optimal_lambda <- final_lasso_model$lambda.min
+cat("Optimal Lambda:", optimal_lambda, "\n")
 
+# Predictions and Evaluation
+lasso_predictions <- predict(final_lasso_model, newx = x_test, s = optimal_lambda, type = "class")
+lasso_confusion <- confusionMatrix(as.factor(lasso_predictions), as.factor(y_test))
+lasso_accuracy <- lasso_confusion$overall["Accuracy"]
 
+# Print Results
+print("Confusion Matrix (LASSO/Elastic Net):")
+print(lasso_confusion)
 
+# Plot LASSO Confusion Matrix
+lasso_conf_matrix <- table(Predicted = lasso_predictions, Actual = y_test)
+lasso_conf_matrix_plot <- as.data.frame(as.table(lasso_conf_matrix))
 
+ggplot(lasso_conf_matrix_plot, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Confusion Matrix Heatmap (LASSO)", x = "Predicted Category", y = "Actual Category") +
+  theme_minimal()
+```
 
+```{r}
+# --------------------------------------------------------------------
+# Hyperparameter Tuning for Random Forest
+# --------------------------------------------------------------------
+set.seed(123)
+
+# Create a tuning grid for mtry
+rf_grid <- expand.grid(mtry = seq(2, ncol(train_data) - 1, by = 1))  # Adjust mtry range
+
+# Train Random Forest with Grid Search
+set.seed(123)
+rf_tuned <- train(
+  bmi_category ~ poverty_category + alcohol_frequency + diabetes_status +
+    household_smoking_status + fast_food_consumption + sleep_hours +
+    milk_type + milk_consumption,
+  data = train_data,
+  method = "rf",
+  tuneGrid = rf_grid,
+  trControl = trainControl(method = "cv", number = 5),
+  importance = TRUE
+)
+
+# View the best mtry value and plot the results
+print(rf_tuned)
+plot(rf_tuned)
+
+# Predictions and Evaluation
+rf_tuned_predictions <- predict(rf_tuned, test_data)
+rf_tuned_confusion <- confusionMatrix(rf_tuned_predictions, test_data$bmi_category)
+rf_tuned_accuracy <- rf_tuned_confusion$overall["Accuracy"]
+
+# Print Results
+print("Confusion Matrix (Tuned Random Forest):")
+print(rf_tuned_confusion)
+
+# Plot Random Forest Confusion Matrix
+rf_conf_matrix <- table(Predicted = rf_tuned_predictions, Actual = test_data$bmi_category)
+rf_conf_matrix_plot <- as.data.frame(as.table(rf_conf_matrix))
+
+ggplot(rf_conf_matrix_plot, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Confusion Matrix Heatmap (Random Forest)", x = "Predicted Category", y = "Actual Category") +
+  theme_minimal()
+```
+
+```{r}
+# Load required library
+if (!require("gbm")) install.packages("gbm")
+library(gbm)
+library(caret)
+library(ggplot2)
+
+# Set up train control for cross-validation
+set.seed(123)
+gbm_control <- trainControl(method = "cv", number = 5)
+
+# Hyperparameter grid for GBM
+gbm_grid <- expand.grid(
+  interaction.depth = c(1, 3, 5),  # Tree depth
+  n.trees = seq(50, 200, 50),      # Number of boosting iterations
+  shrinkage = c(0.01, 0.1),        # Learning rate
+  n.minobsinnode = 10              # Minimum number of observations in terminal nodes
+)
+
+# Train Gradient Boosting Model
+set.seed(123)
+gbm_model <- train(
+  bmi_category ~ poverty_category + alcohol_frequency + diabetes_status +
+    household_smoking_status + fast_food_consumption + sleep_hours +
+    milk_type + milk_consumption,
+  data = train_data,
+  method = "gbm",
+  trControl = gbm_control,
+  tuneGrid = gbm_grid,
+  verbose = FALSE
+)
+
+# View the best model
+print(gbm_model)
+plot(gbm_model)
+
+# Predictions and Evaluation
+gbm_predictions <- predict(gbm_model, test_data)
+gbm_confusion <- confusionMatrix(gbm_predictions, test_data$bmi_category)
+gbm_accuracy <- gbm_confusion$overall["Accuracy"]
+
+# Print Results
+print("Confusion Matrix (Gradient Boosting):")
+print(gbm_confusion)
+
+# Plot Confusion Matrix Heatmap
+gbm_conf_matrix <- table(Predicted = gbm_predictions, Actual = test_data$bmi_category)
+gbm_conf_matrix_plot <- as.data.frame(as.table(gbm_conf_matrix))
+
+ggplot(gbm_conf_matrix_plot, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Confusion Matrix Heatmap (Gradient Boosting)", x = "Predicted Category", y = "Actual Category") +
+  theme_minimal()
+```
+
+```{r}
+# --------------------------------------------------------------------
+# Model Comparison
+# --------------------------------------------------------------------
+comparison <- data.frame(
+  Model = c("LASSO/Elastic Net Logistic Regression", "Tuned Random Forest", "Gradient Boosting Machine"),
+  Accuracy = c(round(lasso_accuracy, 3), round(rf_tuned_accuracy, 3), round(gbm_accuracy, 3))
+)
+
+print("Model Performance Comparison:")
+print(comparison)
+```
 
