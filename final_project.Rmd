@@ -39,7 +39,9 @@ colnames(nhanes) <- ifelse(colnames(nhanes) %in% nhanes_var_name$BMI_714_Variabl
 
 nhanes %>% nrow()
 ```
-
+```{r}
+nhanes %>% select(RIDAGEYR) %>% filter(RIDAGEYR >= 18) %>% nrow()
+```
 
 ```{r}
 nhanes_var_name %>% select(Data_File_Description) %>% unique()
@@ -100,7 +102,7 @@ Missingness:
 Caffeine: caffeine with weight loss: https://pubmed.ncbi.nlm.nih.gov/30335479/
  - high missingess: 15538/15560
 ```{r}
-caffeine_rows <- nhanes_var_name[grep("milk", nhanes_var_name$Variable_Description, ignore.case = TRUE), ]
+caffeine_rows <- nhanes_var_name[grep("caffeine", nhanes_var_name$Variable_Description, ignore.case = TRUE), ]
 ```
 
 Income(INDFMMPC: https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_INQ.htm#INDFMMPC): https://pubmed.ncbi.nlm.nih.gov/29306894/
@@ -137,6 +139,9 @@ protein(DR2TPROT) , carb (DR2TCARB), fat (DR2TTFAT) intake:
  - continuous variable
  - present in doc not in the dataset?
 
+```{r}
+nhanes %>% select(RIDAGEYR, DS1TCAFF) %>% filter(RIDAGEYR >= 18) %>% select(DS1TCAFF) %>% is.na() %>% sum()
+```
 
 # Variable Choosen: 
 Dependent variable: 
@@ -394,11 +399,17 @@ str(agg_data)
 ## Missingness
 NA Summary
 ```{r}
-data.frame(
+library(knitr)
+
+# Create a summary table of missing values
+na_summary <- data.frame(
+  Variable = colnames(agg_data),
   NA_Count = colSums(is.na(agg_data)),
-  NA_Percentage = colSums(is.na(agg_data)) / nrow(agg_data) * 100
+  NA_Percentage = round(colSums(is.na(agg_data)) / nrow(agg_data) * 100, 2)
 )
 
+# Pretty table using kable
+kable(na_summary, format = "markdown", col.names = c("Variable", "NA Count", "NA Percentage (%)"))
 ```
 
 ```{r}
@@ -439,7 +450,7 @@ final_data <- final_data %>%
 
 
 ## realtionship between variable of interest
-```{r, fig.width=10, fig.height=10}
+```{r, fig.width=10, fig.height=5}
 custom_labels <- c(
   "Underweight" = "Under\nWeight",
   "Normal" = "Normal",
@@ -459,7 +470,7 @@ facet_labels <- c(
 )
 
 
-final_data %>%
+plot <- final_data %>%
   mutate(
     milk_type = as.numeric(as.character(milk_type)),
     milk_consumption = as.numeric(as.character(milk_consumption))
@@ -472,7 +483,7 @@ final_data %>%
   ggplot(aes(x = bmi_category, y = value, fill = bmi_category)) +
   geom_boxplot(alpha = 0.7, outlier.color = "red")+
   scale_x_discrete(labels = custom_labels) +
-  facet_wrap(~ variable, scales = "free_y", labeller = labeller(variable = facet_labels)) +
+  facet_wrap(~ variable, scales = "free_y", labeller = labeller(variable = facet_labels), ncol = 4) +
   labs(
     title = "Relationship Between Variables of Interest and BMI Categories",
     x = "BMI Category",
@@ -486,7 +497,8 @@ final_data %>%
     axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
     strip.text = element_text(size = 12), # larger facet title
     axis.title = element_text(size = 12, face = "bold")
-        )  
+        ) 
+  ggsave("relation_btw_variable.png", plot=plot, width = 10, height = 5)
 ```
 
 - no obvious outliers
@@ -506,7 +518,8 @@ cor_matrix <- final_data %>%
 
 # Visualize the correlation matrix
 
-ggcorrplot(cor_matrix, method = "circle", title = "Correlation Between Predictors")
+cor_plot <- ggcorrplot(cor_matrix, method = "circle", title = "Correlation Between Predictors")
+ggsave("correlation_matrix.png", plot=cor_plot)
 ```
 ```{r}
 predictors <- final_data %>%
