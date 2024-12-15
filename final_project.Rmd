@@ -697,6 +697,17 @@ lasso_predictions <- predict(final_lasso_model, newx = x_test, s = optimal_lambd
 lasso_confusion <- confusionMatrix(as.factor(lasso_predictions), as.factor(y_test))
 lasso_accuracy <- lasso_confusion$overall["Accuracy"]
 
+# Plot Regularization Paths
+plot(final_lasso_model$glmnet.fit, xvar = "lambda", label = TRUE)
+abline(v = log(optimal_lambda), col = "red", lty = 2)  # Mark optimal lambda
+legend("topright", legend = "Optimal Lambda", col = "red", lty = 2, cex = 0.8)
+title("Coefficient Path (LASSO/Elastic Net)")
+
+# Plot Cross-Validation Curve
+plot(final_lasso_model, main = "Cross-Validation Curve for LASSO/Elastic Net")
+abline(v = log(optimal_lambda), col = "red", lty = 2)  # Mark optimal lambda
+legend("topright", legend = "Optimal Lambda", col = "red", lty = 2, cex = 0.8)
+
 # Print Results
 print("Confusion Matrix (LASSO/Elastic Net):")
 print(lasso_confusion)
