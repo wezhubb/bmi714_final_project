@@ -171,13 +171,7 @@ variable - present in doc not in the dataset?
 
 # Variable Choosen:
 
-<<<<<<< HEAD
-```{r}
-nhanes %>% select(RIDAGEYR, DS1TCAFF) %>% filter(RIDAGEYR >= 18) %>% select(DS1TCAFF) %>% is.na() %>% sum()
-```
-=======
 Dependent variable: weight(BMXWT)
->>>>>>> 0db7d6069c0c2837ca47a57e11ab094e9a25b926
 
 Independent variable: Dairy product used(DBQ197) Type of Milk(DBQ223A,
 DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U) Frozen meals/ready to go
@@ -489,12 +483,8 @@ final_data <- final_data %>%
 ```
 
 ## realtionship between variable of interest
-<<<<<<< HEAD
-```{r, fig.width=10, fig.height=5}
-=======
 
 ```{r, fig.width=10, fig.height=10}
->>>>>>> 0db7d6069c0c2837ca47a57e11ab094e9a25b926
 custom_labels <- c(
   "Underweight" = "Under\nWeight",
   "Normal" = "Normal",
@@ -864,4 +854,104 @@ comparison <- data.frame(
 print("Model Performance Comparison:")
 print(comparison)
 ```
+# Follow up: Accuracy of Prediction in Held-Out Data
+```{r}
+# Predict on held-out test data
+lasso_predictions <- predict(final_lasso_model, newx = x_test, s = optimal_lambda, type = "class")
 
+# Confusion Matrix
+lasso_confusion <- confusionMatrix(as.factor(lasso_predictions), as.factor(y_test))
+
+# Print accuracy and confusion matrix
+cat("Accuracy of LASSO on Test Data:", lasso_confusion$overall["Accuracy"], "\n")
+cat("Confusion Matrix:")
+print(lasso_confusion)
+
+# Visualize confusion matrix as heatmap
+lasso_conf_matrix <- table(Predicted = lasso_predictions, Actual = y_test)
+lasso_conf_matrix_plot <- as.data.frame(as.table(lasso_conf_matrix))
+
+ggplot(lasso_conf_matrix_plot, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Confusion Matrix Heatmap (LASSO)", x = "Predicted Category", y = "Actual Category") +
+  theme_minimal()
+```
+
+
+
+# permutation
+
+```{r}
+# Number of permutations
+n_permutations <- 1000
+
+# Store permuted accuracies
+permuted_accuracies <- numeric(n_permutations)
+
+# Original Model Accuracy
+original_accuracy <- lasso_accuracy  # Use the accuracy from your original model
+
+# Permutation Loop
+set.seed(123)
+for (i in 1:n_permutations) {
+  # Permute the response variable
+  y_train_permuted <- sample(y_train)
+  
+  # Fit the LASSO model on permuted data
+  permuted_model <- cv.glmnet(x_train, y_train_permuted, family = "multinomial", 
+                              alpha = best_alpha, type.measure = "class")
+  
+  # Predict on test set using optimal lambda
+  permuted_predictions <- predict(permuted_model, newx = x_test, 
+                                  s = permuted_model$lambda.min, type = "class")
+  
+  # Calculate accuracy on test set
+  permuted_confusion <- confusionMatrix(as.factor(permuted_predictions), as.factor(y_test))
+  permuted_accuracies[i] <- permuted_confusion$overall["Accuracy"]
+  if (i %% 100 == 0) {
+    cat("Permutation", i, "\n")
+  }
+}
+```
+
+```{r}
+# Calculate Permutation-Based p-value
+p_value <- mean(permuted_accuracies >= original_accuracy)
+
+# Print Results
+cat("Original Model Accuracy:", original_accuracy, "\n")
+cat("Permutation-based p-value:", p_value, "\n")
+
+# Plot Permutation Distribution
+permuted_data <- data.frame(Accuracy = permuted_accuracies)
+
+# Plot using ggplot
+plot <- ggplot(permuted_data, aes(x = Accuracy)) +
+  geom_histogram(bins = 40, fill = "lightblue", color = "black") +
+  labs(
+    title = "Permutation Test for LASSO Model",
+    x = "Accuracy",
+    y = "Frequency"
+  ) +
+  theme_minimal()+
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    axis.text.y = element_text(size = 10),
+    axis.text.x = element_text(size = 10, hjust = 1),
+    axis.title = element_text(size = 12, face = "bold")
+        ) 
+ ggsave("permutation_test.png", plot=plot, width = 10, height = 5)
+
+```
+
+The LASSO model achieved an accuracy of 0.998 on the test set, which is extremely high.
+
+Permutation-Based p-Value is 0 means that none of the permuted models (with randomly shuffled response variable) achieved an accuracy equal to or greater than the original model’s accuracy which indicates that the observed accuracy of the LASSO model is highly unlikely to occur by random chance.
+
+Distribution of Permuted Accuracies, The histogram shows the distribution of accuracies obtained from 1000 permutations. The permuted accuracies are clustered much lower (around ~0.43-0.44), while the original accuracy (0.998) is far outside this range, which reinforces the idea that the predictors have a strong, non-random association with the response variable (BMI category).
+
+**Conclusion**
+The LASSO model’s accuracy is statistically significant. The permutation test confirms that the high predictive performance is not due to random chance, as none of the permuted models achieved comparable accuracy. This validates the model and the importance of the selected predictors in classifying BMI categories.
