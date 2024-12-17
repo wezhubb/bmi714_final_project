@@ -32,6 +32,7 @@ library(tidyr)
 library(ggcorrplot)
 library(caret)
 library(glmnet)
+library(knitr)
 ```
 
 # View Data
@@ -43,25 +44,26 @@ nhanes_var_name <- read.csv("data/BMI714_NHANES_VariableDictionary.csv", header 
 colnames(nhanes) <- ifelse(colnames(nhanes) %in% nhanes_var_name$BMI_714_Variable_Name, 
                            nhanes_var_name$Variable_Name[match(colnames(nhanes),nhanes_var_name$BMI_714_Variable_Name)], 
                            colnames(nhanes))  # Keep names unchanged if not in mapping
-nhanes %>% nrow()
+cat("Data Dimensions:", nrow(nhanes), "rows and", ncol(nhanes), "columns\n")
+
 ```
 
 ```{r}
-nhanes %>% dplyr::select(RIDAGEYR) %>% filter(RIDAGEYR >= 18) %>% nrow()
+cat("Data Dimensions for adult:", nhanes %>% dplyr::select(RIDAGEYR) %>% filter(RIDAGEYR >= 18) %>% nrow(), "rows\n")
+
 ```
 
 
 ```{r}
+#quick examine the data
 nhanes_var_name %>% dplyr::select(Data_File_Description) %>% unique()
 ```
-
-weight in kg: BMXWT
 
 ```{r}
 # Calculate the percentage of missing values for each column
 missing_percent <- colSums(is.na(nhanes)) / nrow(nhanes)
 
-# Filter columns with less than 10% missingness
+# Filter columns with less than 20% missingness
 filtered_df <- nhanes[, missing_percent < 0.20]
 dim(filtered_df)
 ```
@@ -74,103 +76,41 @@ filtered_columns <- colnames(filtered_df)
 filtered_var_dict <- nhanes_var_name[nhanes_var_name$Variable_Name %in% filtered_columns, ]
 ```
 
+
 ```{r}
-nhanes %>% 
-  dplyr::select(ALQ111, RIDAGEYR) %>% 
-  filter(RIDAGEYR > 18) %>%
-  filter(rowSums(is.na(.)) == 1) %>%  # Check if all selected columns are NA
-  nrow()
+cat("Number of rows with BMI missing:", nhanes %>% dplyr::select(BMXBMI) %>% is.na() %>% sum(), "\n")
 ```
 
-```{r}
-nhanes %>% 
-  dplyr::select(ALQ111, RIDAGEYR) %>% 
-  filter(RIDAGEYR > 18)
-```
+# Independent variable consideration
 
 ```{r}
-nhanes %>% dplyr::select(BMXWT) %>% is.na() %>% sum()
-```
-
-## independent variable consideration
-
-variable details in nhanes website:
-<https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?Cycle=2017-2020>
-
-Dairy product used(DBQ197:
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBQ197>):
-Greater consumption of total dairy products prevention of weight gain in
-middle-aged and elderly women who are initially normal weight.
-<https://pmc.ncbi.nlm.nih.gov/articles/PMC4807700/>
-
-Type of Milk(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U:
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBQ223A>):
-1%/skim milk is more common among overweight/obese preschoolers,
-potentially reflecting the choice of parents to give overweight/obese
-children low-fat milk to drink. Nevertheless, 1%/skim milk does not
-appear to restrain body weight gain between 2–4 years in this age range,
-emphasizing a need for weight-targeted recommendations with a greater
-evidence basis. <https://pmc.ncbi.nlm.nih.gov/articles/PMC4439101/>
-Missingness:
-
-```{r}
-(nhanes %>% 
+# type of milk
+milk_type_missing <- (nhanes %>% 
   dplyr::select(DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U) %>% 
   filter(rowSums(is.na(.)) == ncol(.)) %>%  # Check if all selected columns are NA
   nrow()) / nrow(nhanes) # Count the number of such rows
+cat("Milk type missingness:", milk_type_missing, "\n")
 ```
 
-Caffeine: caffeine with weight loss:
-<https://pubmed.ncbi.nlm.nih.gov/30335479/> - high missingess:
-15538/15560
 
 ```{r}
+# Caffeine
+# check which variable has caffeine in description
 caffeine_rows <- nhanes_var_name[grep("caffeine", nhanes_var_name$Variable_Description, ignore.case = TRUE), ]
+
+DS1TCAFF_missing <- (nhanes %>% 
+  dplyr::select(DS1TCAFF) %>% 
+  filter(rowSums(is.na(.)) == ncol(.)) %>%  # Check if all selected columns are NA
+  nrow()) / nrow(nhanes) 
+DS2TCAFF_missing <- (nhanes %>% 
+  dplyr::select(DS2TCAFF) %>% 
+  filter(rowSums(is.na(.)) == ncol(.)) %>%  # Check if all selected columns are NA
+  nrow()) / nrow(nhanes) 
+
+cat("DS1TCAFF missingness:", DS1TCAFF_missing, "\n")
+cat("DS2TCAFF missingness:", DS2TCAFF_missing, "\n")
 ```
 
-Income(INDFMMPC:
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_INQ.htm#INDFMMPC>):
-<https://pubmed.ncbi.nlm.nih.gov/29306894/>
-
-Sleep(SLQ300, SLQ310, SLQ320, SLQ330:
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_SLQ.htm#SLD012>):<https://pmc.ncbi.nlm.nih.gov/articles/PMC9031614/>
-
-Smoking(SMD460:
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_SMQFAM.htm#SMD460>):
-<https://pubmed.ncbi.nlm.nih.gov/7039293/>
-
-Diabetes(DIQ010:
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DIQ.htm#DIQ010>):
-<https://www.baptisthealth.com/blog/family-health/does-diabetes-cause-weight-loss-or-weight-gain>
-
-Frozen meals/ready to go meal/fast food/resturation: (DBD905, DBD910:
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DBQ.htm#DBD905>):
-<https://pmc.ncbi.nlm.nih.gov/articles/PMC4302389/>
-
-race(RIDRETH3,
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DEMO.htm#RIDRETH1>):
-<https://pmc.ncbi.nlm.nih.gov/articles/PMC3464818/>
-
-Alcohol consumption(ALQ121:
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_ALQ.htm#ALQ121>): -
-note: the data only ask this question for people 18 age and up. Should
-we classify people below don't consumption any alcohol? Missing:
-
-```{r}
-(nhanes %>% 
-  dplyr::select(ALQ111, RIDAGEYR) %>% 
-  filter(RIDAGEYR > 18) %>%
-  filter(rowSums(is.na(.)) == 1) %>%
-  nrow()) / (
-nhanes %>% 
-  dplyr::select(ALQ111, RIDAGEYR) %>% 
-  filter(RIDAGEYR > 18) %>% nrow())
-```
-
-protein(DR2TPROT) , carb (DR2TCARB), fat (DR2TTFAT) intake: -
-<https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2017/DataFiles/P_DR2TOT.htm#DR2TPROT> -
-can have more specific group - 每个都是3673/14300 missing - continuous
-variable - present in doc not in the dataset?
 
 # Variable Choosen:
 
@@ -188,21 +128,22 @@ Goal: how socioeconmic state (income), eating behaviour affect obesity
 # Prep data
 
 ```{r}
+# select predictor columns
 data <- nhanes %>% 
   dplyr::select(	
 BMXBMI, DBQ197, DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, DBD905, DBD910, INDFMMPC, SLQ300, SLQ310, SLQ320, SLQ330, SMD460, DIQ010, ALQ121, RIDAGEYR) %>% # select variables
   filter(!is.na(	
-BMXBMI)) %>% # remove rows with missing weight
+BMXBMI)) %>% # remove rows with missing BMI
 filter(RIDAGEYR >= 18) # remove rows with age < 16)
 
 ```
 
 ## BMI category
 
-according to
-<https://www.cdc.gov/bmi/adult-calculator/bmi-categories.html>
+according to <https://www.cdc.gov/bmi/adult-calculator/bmi-categories.html>
 
 ```{r}
+# Create a new column for BMI category
 data <- data %>%
   mutate(
     bmi_category = case_when(
@@ -219,7 +160,7 @@ data <- data %>%
 
 Note: predictors are ordinal, encoding them to reflect their order.
 
-```{r}
+```{r, warning=FALSE}
 ########### Type of Milk ###########
 # For Type of Milk DBQ223A, DBQ223B, DBQ223C, DBQ223D, DBQ223E, DBQ223U, we will combine them into one variable. 
 #  want to see combined effect of drinking mupltiple type of milk: Group participants who drink multiple types of milk into a single “Mixed Milk” category.
@@ -273,8 +214,6 @@ data <- data %>%
       is.na(INDFMMPC) ~ NA_character_  
     )
   )
-
-
 
 
 ########### Alcohol  ###########
@@ -394,6 +333,7 @@ data <- data %>%
 ## check age distribution
 
 ```{r}
+# plot age distribution, ensure no extreme age like 500
 data %>% ggplot(aes(x = RIDAGEYR)) +
   geom_histogram(binwidth = 10, fill = "blue", color = "black", alpha = 0.7) +
   labs(
@@ -404,17 +344,17 @@ data %>% ggplot(aes(x = RIDAGEYR)) +
   theme_minimal()
 ```
 
-## AGG data
 
 ```{r}
-agg_data <- data %>%
+# rename bmi and age columns
+data <- data %>%
   dplyr::select(BMXBMI, bmi_category, RIDAGEYR, milk_type, milk_consumption, poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours) %>%
   rename(
     bmi = BMXBMI,
     age = RIDAGEYR
   )
 
-head(agg_data)
+head(data)
   
 ```
 
@@ -422,10 +362,10 @@ head(agg_data)
 
 ```{r}
 # Summary of data
-summary(agg_data)
+summary(data)
 
 # Check data structure
-str(agg_data)
+str(data)
 ```
 
 ## Missingness
@@ -433,13 +373,11 @@ str(agg_data)
 NA Summary
 
 ```{r}
-library(knitr)
-
 # Create a summary table of missing values
 na_summary <- data.frame(
-  Variable = colnames(agg_data),
-  NA_Count = colSums(is.na(agg_data)),
-  NA_Percentage = round(colSums(is.na(agg_data)) / nrow(agg_data) * 100, 2)
+  Variable = colnames(data),
+  NA_Count = colSums(is.na(data)),
+  NA_Percentage = round(colSums(is.na(data)) / nrow(data) * 100, 2)
 )
 
 # Pretty table using kable
@@ -447,7 +385,8 @@ kable(na_summary, format = "markdown", col.names = c("Variable", "NA Count", "NA
 ```
 
 ```{r}
-final_data <- agg_data %>%
+# final data will remove all the NA rows
+final_data <- data %>%
   filter(!is.na(milk_type), !is.na(milk_consumption), !is.na(poverty_category), !is.na(alcohol_frequency), !is.na(diabetes_status), !is.na(household_smoking_status), !is.na(fast_food_consumption), !is.na(sleep_hours))
 ```
 
@@ -459,11 +398,12 @@ summary(final_data)
 str(final_data)
 ```
 
-## factorize Ordinal Variables
+## Factorize Ordinal Variables
 
 predictors are ordinal, encoding them to reflect their order.
 
 ```{r}
+# Factorize ordinal variables into numbers represent general level for future analysis
 final_data <- final_data %>%
   mutate(bmi_category = factor(bmi_category, 
       levels = c("Underweight", "Normal", "Overweight", "Obesity"), 
@@ -485,9 +425,10 @@ final_data <- final_data %>%
   mutate(fast_food_consumption = as.numeric(fast_food_consumption))
 ```
 
-## realtionship between variable of interest
+## Realtionship between variable of interest
 
 ```{r, fig.width=10, fig.height=10}
+# Custom labels for BMI categories
 custom_labels <- c(
   "Underweight" = "Under\nWeight",
   "Normal" = "Normal",
@@ -495,6 +436,7 @@ custom_labels <- c(
   "Obesity" = "Obesity"
 )
 
+# Custom labels for each facet
 facet_labels <- c(
   "poverty_category" = "Poverty Category",
   "alcohol_frequency" = "Alcohol Frequency",
@@ -506,28 +448,27 @@ facet_labels <- c(
   "milk_consumption" = "Milk Consumption"
 )
 
-
 plot <- final_data %>%
   mutate(
     milk_type = as.numeric(as.character(milk_type)),
     milk_consumption = as.numeric(as.character(milk_consumption))
   ) %>%
   pivot_longer(
-    cols = c(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption),
+    cols = c(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption), 
     names_to = "variable",
-    values_to = "value"
+    values_to = "value" # reshape data
   ) %>%
   ggplot(aes(x = bmi_category, y = value, fill = bmi_category)) +
-  geom_boxplot(alpha = 0.7, outlier.color = "red")+
+  geom_boxplot(alpha = 0.7, outlier.color = "red")+ 
   scale_x_discrete(labels = custom_labels) +
-  facet_wrap(~ variable, scales = "free_y", labeller = labeller(variable = facet_labels), ncol = 4) +
+  facet_wrap(~ variable, scales = "free_y", labeller = labeller(variable = facet_labels), ncol = 4) + # create facet for each variable
   labs(
     title = "Relationship Between Variables of Interest and BMI Categories",
     x = "BMI Category",
     y = "Variable of Interest Value"
   ) +
   theme_minimal() +
-  theme(
+  theme( # customize font size and style
     legend.position = "none",
     plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
     axis.text.y = element_text(size = 10),
@@ -535,17 +476,20 @@ plot <- final_data %>%
     strip.text = element_text(size = 12), # larger facet title
     axis.title = element_text(size = 12, face = "bold")
         ) 
-  ggsave("relation_btw_variable.png", plot=plot, width = 10, height = 5)
+# save plot
+ggsave("relation_btw_variable.png", plot=plot, width = 10, height = 5)
+# display plot
+plot
 ```
 
--   no obvious outliers
 
-## correlation
+## Correlation
 
 -   ordinal variable
--   non-linear realtionship -\> use spearman correlation
+-   non-linear relationship -\> use spearman correlation
 
 ```{r}
+# Calculate the correlation matrix for each variable pairs
 cor_matrix <- final_data %>%
   dplyr::select(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption) %>%
   mutate(
@@ -557,79 +501,16 @@ cor_matrix <- final_data %>%
 # Visualize the correlation matrix
 
 cor_plot <- ggcorrplot(cor_matrix, method = "circle", title = "Correlation Between Predictors")
-ggsave("correlation_matrix.png", plot=cor_plot)
+ggsave("correlation_matrix.png", plot=cor_plot) # save plot
+cor_plot
 ```
 
-```{r}
-predictors <- final_data %>%
-  dplyr::select(poverty_category, alcohol_frequency, diabetes_status, household_smoking_status, fast_food_consumption, sleep_hours, milk_type, milk_consumption) %>%
-  mutate(
-    milk_type = as.numeric(as.character(milk_type)),
-    milk_consumption = as.numeric(as.character(milk_consumption))
-  )
 
-results <- data.frame(
-  Var1 = character(),  # First variable
-  Var2 = character(),  # Second variable
-  Correlation = numeric(),
-  T_Statistic = numeric(),
-  P_Value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-for (i in 1:(ncol(predictors) - 1)) {
-  for (j in (i + 1):ncol(predictors)) {
-    # Get variable names
-    var1 <- colnames(predictors)[i]
-    var2 <- colnames(predictors)[j]
-    
-    # Perform correlation test
-    test <- cor.test(predictors[[var1]], predictors[[var2]], method = "pearson")  # Use "spearman" if needed
-    
-    # Extract statistics
-    correlation <- test$estimate
-    t_statistic <- test$statistic
-    p_value <- test$p.value
-    
-    # Store results in dataframe
-    results <- rbind(results, data.frame(
-      Var1 = var1,
-      Var2 = var2,
-      Correlation = correlation,
-      T_Statistic = t_statistic,
-      P_Value = p_value
-    ))
-  }
-}
-
-```
-
-```{r}
-
-results %>%
-  dplyr::select(Var1, Var2, T_Statistic, P_Value) %>%
-  rowwise() %>%
-  mutate(Output = paste("For pair (", Var1, ", ", Var2, "): T-Statistic = ", T_Statistic, ", P-Value = ", P_Value, sep = "")) %>%
-  pull(Output) %>%
-  writeLines()
-```
-
-```{r}
-results$Bonferroni_Adjusted_P <- p.adjust(results$P_Value, method = "bonferroni")
-
-results %>%
-  dplyr::select(Var1, Var2, T_Statistic, Bonferroni_Adjusted_P) %>%
-  rowwise() %>%
-  mutate(Output = paste("For pair (", Var1, ", ", Var2, "): T-Statistic = ", T_Statistic, ", Padj-Value = ", Bonferroni_Adjusted_P, sep = "")) %>%
-  pull(Output) %>%
-  writeLines()
-```
-
-## scale
+## Scaling
 
 ```{r}
 # Plot the distribution of sleep hours
-ggplot(final_data, aes(x = sleep_hours)) +
+sleep_plot <- ggplot(final_data, aes(x = sleep_hours)) +
   geom_histogram(binwidth = 0.5, fill = "skyblue", color = "black", alpha = 0.7) +
   geom_density(aes(y = after_stat(count)), color = "darkblue", size = 1.2) +
   labs(
@@ -643,6 +524,9 @@ ggplot(final_data, aes(x = sleep_hours)) +
     axis.text = element_text(size = 12),
     axis.title = element_text(size = 12, face = "bold")
   )
+
+ggsave("sleep_distribution.png", plot=sleep_plot) # save plot
+sleep_plot
 ```
 
 ```{r}
@@ -655,7 +539,7 @@ summary(final_data)
 
 # Model Building
 
-```{r}
+```{r, warning=FALSE}
 # Ensure target variable is a factor
 final_data$bmi_category <- as.factor(final_data$bmi_category)
 
@@ -739,7 +623,7 @@ ggplot(lasso_conf_matrix_plot, aes(x = Predicted, y = Actual, fill = Freq)) +
 str(final_data[scale_columns])
 ```
 
-```{r}
+```{r, warning=FALSE}
 # Standardize Predictors
 scale_columns <- c("sleep_hours", "fast_food_consumption", "poverty_category", 
                    "alcohol_frequency", "diabetes_status", "household_smoking_status")
@@ -819,10 +703,10 @@ comparison <- data.frame(
 )
 comparison
 ```
-# Follow-up Analysis: Accuracy of Prediction in Held-Out Data
+# Follow-up Analysis
 Please refer to the model evaluation matrix in the previous section for the accuracy of the LASSO model and the alternative model on the held-out test data.
 
-# permutation
+# Permutation
 
 ```{r, warning=FALSE}
 # Number of permutations
@@ -851,9 +735,6 @@ for (i in 1:n_permutations) {
   # Calculate accuracy on test set
   permuted_confusion <- confusionMatrix(as.factor(permuted_predictions), as.factor(y_test))
   permuted_accuracies[i] <- permuted_confusion$overall["Accuracy"]
-  if (i %% 100 == 0) {
-    cat("Permutation", i, "\n")
-  }
 }
 ```
 
@@ -885,13 +766,6 @@ plot <- ggplot(permuted_data, aes(x = Accuracy)) +
     axis.title = element_text(size = 12, face = "bold")
         ) 
  ggsave("permutation_test.png", plot=plot, width = 10, height = 5)
+ plot
 ```
 
-The LASSO model achieved an accuracy of 0.998 on the test set, which is extremely high.
-
-Permutation-Based p-Value is 0 means that none of the permuted models (with randomly shuffled response variable) achieved an accuracy equal to or greater than the original model’s accuracy which indicates that the observed accuracy of the LASSO model is highly unlikely to occur by random chance.
-
-Distribution of Permuted Accuracies, The histogram shows the distribution of accuracies obtained from 1000 permutations. The permuted accuracies are clustered much lower (around ~0.43-0.44), while the original accuracy (0.998) is far outside this range, which reinforces the idea that the predictors have a strong, non-random association with the response variable (BMI category).
-
-**Conclusion**
-The LASSO model’s accuracy is statistically significant. The permutation test confirms that the high predictive performance is not due to random chance, as none of the permuted models achieved comparable accuracy. This validates the model and the importance of the selected predictors in classifying BMI categories.
