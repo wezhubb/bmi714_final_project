@@ -81,7 +81,7 @@ filtered_var_dict <- nhanes_var_name[nhanes_var_name$Variable_Name %in% filtered
 cat("Number of rows with BMI missing:", nhanes %>% dplyr::select(BMXBMI) %>% is.na() %>% sum(), "\n")
 ```
 
-# Independent variable consideration
+# Independent Variable Consideration
 
 ```{r}
 # type of milk
@@ -91,7 +91,6 @@ milk_type_missing <- (nhanes %>%
   nrow()) / nrow(nhanes) # Count the number of such rows
 cat("Milk type missingness:", milk_type_missing, "\n")
 ```
-
 
 ```{r}
 # Caffeine
@@ -125,7 +124,7 @@ Alcohol consumption(ALQ121)
 Goal: how socioeconmic state (income), eating behaviour affect obesity
 (BMI) in adult
 
-# Prep data
+# Prep Data
 
 ```{r}
 # select predictor columns
@@ -138,7 +137,7 @@ filter(RIDAGEYR >= 18) # remove rows with age < 16)
 
 ```
 
-## BMI category
+## BMI Category
 
 according to <https://www.cdc.gov/bmi/adult-calculator/bmi-categories.html>
 
@@ -156,7 +155,7 @@ data <- data %>%
   )
 ```
 
-## Process independent variable
+## Process Independent Variable
 
 Note: predictors are ordinal, encoding them to reflect their order.
 
@@ -400,7 +399,7 @@ str(final_data)
 
 ## Factorize Ordinal Variables
 
-predictors are ordinal, encoding them to reflect their order.
+Note: Predictors are ordinal, encoding them to reflect their order.
 
 ```{r}
 # Factorize ordinal variables into numbers represent general level for future analysis
@@ -425,7 +424,7 @@ final_data <- final_data %>%
   mutate(fast_food_consumption = as.numeric(fast_food_consumption))
 ```
 
-## Realtionship between variable of interest
+## Realtionship between Variables of Interest
 
 ```{r, fig.width=10, fig.height=10}
 # Custom labels for BMI categories
@@ -481,7 +480,6 @@ ggsave("relation_btw_variable.png", plot=plot, width = 10, height = 5)
 # display plot
 plot
 ```
-
 
 ## Correlation
 
@@ -619,7 +617,7 @@ ggplot(lasso_conf_matrix_plot, aes(x = Predicted, y = Actual, fill = Freq)) +
 ```
 
 ```{r}
-# Find 
+# Find variables to standardize
 str(final_data[scale_columns])
 ```
 
