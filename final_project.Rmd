@@ -45,12 +45,11 @@ colnames(nhanes) <- ifelse(colnames(nhanes) %in% nhanes_var_name$BMI_714_Variabl
                            colnames(nhanes))  # Keep names unchanged if not in mapping
 nhanes %>% nrow()
 ```
-<<<<<<< HEAD
+
 ```{r}
 nhanes %>% dplyr::select(RIDAGEYR) %>% filter(RIDAGEYR >= 18) %>% nrow()
 ```
-=======
->>>>>>> 0db7d6069c0c2837ca47a57e11ab094e9a25b926
+
 
 ```{r}
 nhanes_var_name %>% dplyr::select(Data_File_Description) %>% unique()
